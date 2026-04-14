@@ -104,11 +104,8 @@ router.put('/:id', dealerProtect, upload.array('images', 5), async (req, res) =>
     if (!product) return res.status(404).json({ message: 'Product not found' });
     const updates = { ...req.body };
     if (req.files?.length) {
-      updates.images = await processImages(req.files);
+      updates.images = processImages(req.files);
     } else if (req.body.images) {
-      updates.images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
-    }
-    } else if (req.body.images && !req.files?.length) {
       updates.images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
     }
     if (updates.sizes && typeof updates.sizes === 'string') updates.sizes = JSON.parse(updates.sizes);
