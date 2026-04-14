@@ -4,9 +4,27 @@ const Product = require('../models/Product');
 const ActivityLog = require('../models/ActivityLog');
 const { dealerProtect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { uploadToCloudinary, hasCloudinary } = require('../middleware/upload');
 const fs = require('fs');
+const path = require('path');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+
+const processImages = async (files) => {
+  if (!files || files.length === 0) return [];
+  if (hasCloudinary()) {
+    // Upload to Cloudinary
+    const urls = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
+    return urls;
+  } else {
+    // Save to local disk
+    return files.map(f => {
+      const filename = `${Date.now()}-${f.originalname}`;
+      fs.writeFileSync(path.join('uploads', filename), f.buffer);
+      return `/uploads/${filename}`;
+    });
+  }
+};
 
 const log = (dealer, action, meta = {}) => {
   ActivityLog.create({ actorType: 'dealer', actorId: dealer._id, actorName: dealer.name, actorEmail: dealer.email, action, meta }).catch(() => {});
@@ -67,7 +85,7 @@ router.post('/', dealerProtect, upload.array('images', 5), async (req, res) => {
     // Use uploaded files if present, otherwise use images array from JSON body
     let images = [];
     if (req.files && req.files.length > 0) {
-      images = req.files.map(f => `/uploads/${f.filename}`);
+      images = await processImages(req.files);
     } else if (req.body.images) {
       images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
     }
@@ -96,7 +114,10 @@ router.put('/:id', dealerProtect, upload.array('images', 5), async (req, res) =>
     if (!product) return res.status(404).json({ message: 'Product not found' });
     const updates = { ...req.body };
     if (req.files?.length) {
-      updates.images = req.files.map(f => `/uploads/${f.filename}`);
+      updates.images = await processImages(req.files);
+    } else if (req.body.images) {
+      updates.images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
+    }
     } else if (req.body.images && !req.files?.length) {
       updates.images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
     }
