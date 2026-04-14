@@ -4,26 +4,16 @@ const Product = require('../models/Product');
 const ActivityLog = require('../models/ActivityLog');
 const { dealerProtect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
-const { uploadToCloudinary, hasCloudinary } = require('../middleware/upload');
-const fs = require('fs');
-const path = require('path');
 
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+// Convert uploaded file buffer to base64 data URL
+const toDataUrl = (file) => {
+  const mime = file.mimetype || 'image/jpeg';
+  return `data:${mime};base64,${file.buffer.toString('base64')}`;
+};
 
-const processImages = async (files) => {
+const processImages = (files) => {
   if (!files || files.length === 0) return [];
-  if (hasCloudinary()) {
-    // Upload to Cloudinary
-    const urls = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
-    return urls;
-  } else {
-    // Save to local disk
-    return files.map(f => {
-      const filename = `${Date.now()}-${f.originalname}`;
-      fs.writeFileSync(path.join('uploads', filename), f.buffer);
-      return `/uploads/${filename}`;
-    });
-  }
+  return files.map(f => toDataUrl(f));
 };
 
 const log = (dealer, action, meta = {}) => {
@@ -85,7 +75,7 @@ router.post('/', dealerProtect, upload.array('images', 5), async (req, res) => {
     // Use uploaded files if present, otherwise use images array from JSON body
     let images = [];
     if (req.files && req.files.length > 0) {
-      images = await processImages(req.files);
+      images = processImages(req.files);
     } else if (req.body.images) {
       images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
     }
