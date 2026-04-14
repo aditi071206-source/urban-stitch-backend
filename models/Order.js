@@ -15,7 +15,7 @@ const orderSchema = new mongoose.Schema({
   shippingAddress: {
     name: String, phone: String, address: String, city: String, pincode: String
   },
-  paymentMethod: { type: String, enum: ['UPI', 'Card', 'COD'], required: true },
+  paymentMethod: { type: String, required: true },
   paymentStatus: { type: String, enum: ['Pending', 'Paid', 'Failed'], default: 'Pending' },
   orderStatus: {
     type: String,
@@ -28,7 +28,9 @@ const orderSchema = new mongoose.Schema({
   couponCode: String,
   transactionId: String,
   expectedDelivery: Date,
-  deliveredAt: Date
+  deliveredAt: Date,
+  cancelledAt: Date,
+  refundPercent: { type: Number, default: 0 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

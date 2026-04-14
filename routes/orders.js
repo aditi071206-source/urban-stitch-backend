@@ -140,6 +140,35 @@ router.get('/', dealerProtect, async (req, res) => {
   }
 });
 
+// Cancel order (user)
+router.put('/:id/cancel', protect, async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (['Delivered', 'Cancelled'].includes(order.orderStatus))
+      return res.status(400).json({ message: `Cannot cancel a ${order.orderStatus} order` });
+
+    const hoursSincePlaced = (Date.now() - new Date(order.createdAt)) / (1000 * 60 * 60);
+    const refundPercent = hoursSincePlaced <= 24 ? 50 : 0;
+
+    order.orderStatus = 'Cancelled';
+    order.cancelledAt = new Date();
+    order.refundPercent = refundPercent;
+    await order.save();
+
+    await Notification.create({
+      type: 'ORDER_CANCELLED',
+      title: 'Order Cancelled',
+      message: `Order #${order._id.toString().slice(-6).toUpperCase()} cancelled by ${req.user.name}. Refund: ${refundPercent}%`,
+      relatedId: order._id
+    });
+
+    res.json({ order, refundPercent, message: refundPercent > 0 ? `Order cancelled. ${refundPercent}% refund will be processed.` : 'Order cancelled. No refund applicable.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Update order status (dealer)
 router.put('/:id/status', dealerProtect, async (req, res) => {
   try {
