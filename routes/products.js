@@ -64,7 +64,13 @@ router.get('/:id', async (req, res) => {
 router.post('/', dealerProtect, upload.array('images', 5), async (req, res) => {
   try {
     const { name, description, price, originalPrice, category, subCategory, sizes, brand, tags, isFeatured } = req.body;
-    const images = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
+    // Use uploaded files if present, otherwise use images array from JSON body
+    let images = [];
+    if (req.files && req.files.length > 0) {
+      images = req.files.map(f => `/uploads/${f.filename}`);
+    } else if (req.body.images) {
+      images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
+    }
     const parsedSizes = typeof sizes === 'string' ? JSON.parse(sizes) : sizes;
     const parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
     const product = await Product.create({
@@ -89,7 +95,11 @@ router.put('/:id', dealerProtect, upload.array('images', 5), async (req, res) =>
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Product not found' });
     const updates = { ...req.body };
-    if (req.files?.length) updates.images = req.files.map(f => `/uploads/${f.filename}`);
+    if (req.files?.length) {
+      updates.images = req.files.map(f => `/uploads/${f.filename}`);
+    } else if (req.body.images && !req.files?.length) {
+      updates.images = Array.isArray(req.body.images) ? req.body.images : JSON.parse(req.body.images);
+    }
     if (updates.sizes && typeof updates.sizes === 'string') updates.sizes = JSON.parse(updates.sizes);
     if (updates.tags && typeof updates.tags === 'string') updates.tags = JSON.parse(updates.tags);
     if (updates.price && updates.originalPrice)
